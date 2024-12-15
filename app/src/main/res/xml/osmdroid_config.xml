@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<osm-pref>
+    <pref key="osmdroid_base_path" value="osmdroid" />
+    <pref key="osmdroid_tile_cache" value="tile" />
+</osm-pref>
