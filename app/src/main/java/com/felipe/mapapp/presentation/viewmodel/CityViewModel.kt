@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -28,6 +29,9 @@ class CityViewModel @Inject constructor(
     private val _favorites = MutableStateFlow<List<Int>>(emptyList())
     val favorites: StateFlow<List<Int>> = _favorites
 
+    private val _showFavoritesOnly = MutableStateFlow(false)
+    val showFavoritesOnly: StateFlow<Boolean> = _showFavoritesOnly
+
     init {
         viewModelScope.launch(Dispatchers.IO) {
             val favoriteCities = repository.getFavorites()
@@ -36,16 +40,31 @@ class CityViewModel @Inject constructor(
 
         viewModelScope.launch(Dispatchers.IO) {
             val cities = repository.getCities()
+            val sortedCities = cities.sortedBy { it.name }
             cities.forEach { prefixTree.insert(it.name, it) }
-            _filteredCities.value = cities
+            _filteredCities.value = sortedCities
         }
 
         viewModelScope.launch(Dispatchers.IO) {
-            searchQuery.collect { query ->
-                _filteredCities.value = if (query.isEmpty()) {
-                    prefixTree.getAllCities()
+            combine(searchQuery, _showFavoritesOnly) { query, showFavorites ->
+                Pair(query, showFavorites)
+            }.collect { (query, showFavorites) ->
+                _filteredCities.value = if (showFavorites) {
+                    val favoriteCities = _favorites.value.mapNotNull { id ->
+                        prefixTree.searchById(id)
+                    }.sortedBy { it.name }
+
+                    if (query.isEmpty()) {
+                        favoriteCities
+                    } else {
+                        favoriteCities.filter { it.name.startsWith(query, ignoreCase = true) }
+                    }
                 } else {
-                    prefixTree.search(query)
+                    if (query.isEmpty()) {
+                        prefixTree.getAllCities().sortedBy { it.name }
+                    } else {
+                        prefixTree.search(query).sortedBy { it.name }
+                    }
                 }
             }
         }
@@ -65,6 +84,9 @@ class CityViewModel @Inject constructor(
                 _favorites.value = _favorites.value + city.id
             }
         }
+    }
+    fun toggleShowFavoritesOnly() {
+        _showFavoritesOnly.value = !_showFavoritesOnly.value
     }
 }
 

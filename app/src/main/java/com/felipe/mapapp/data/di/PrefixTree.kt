@@ -23,6 +23,9 @@ class PrefixTree {
         }
         return current.cities
     }
+    fun searchById(id: Int): City? {
+        return allCities.find { it.id == id }
+    }
 
     fun getAllCities(): List<City> = allCities
 }
